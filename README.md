@@ -1,5 +1,5 @@
 # MidiExtractor
-Extracts midi files from binary file.
+Extracts midi files embedded in binary files.
 
 Made in like 2 hours on a whim to extract midis from an asset pack file. I already know it's awful.
 
