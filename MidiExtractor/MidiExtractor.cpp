@@ -65,7 +65,7 @@ void writeMidiFile(ifstream& f, size_t offset)
     // Output file stream
     ofstream oFile;
 
-    // Ouput file name
+    // Output file name
     string oFileName = "output/Midi" + to_string((int)offset - 4) + ".mid";
 
     // Open output file
