@@ -3,60 +3,32 @@
 #include <string>
 #include <chrono>
 
-// For creating an output folder...
-#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING // To silence visual studio warning about filesystem
-
-#if __cplusplus < 201703L // If the version of C++ is less than 17
-// It was still in the experimental:: namespace
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#else
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif
-
-// Header macros
+// * Header macros
 #define MAGIC_HEADER "MThd"
 #define MAGIC_TRACK "MTrk"
 
-// For convenience :(
+// * For convenience :(
 using namespace std;
 
 // File reading helpers
 template<unsigned len> string readString(istream& stream)
 {
-    char buff[len + 1] = { 0 };
+    char buff[len + 1] = {0};
     stream.read(buff, len);
     return std::string(buff);
 }
 
-template <typename T, unsigned length = sizeof(T)> T readBytes(std::ifstream& f)
+template <typename T, unsigned length=sizeof(T)> T readBytes(std::ifstream& f)
 {
-    T temp;
-    f.read((char*)&temp, length);
-    return temp;
+	T temp;
+	f.read((char*)&temp, length);
+	return temp;
 }
 
 void readBytesToFile(ifstream& f, ofstream& oFile, size_t len)
 {
-    for (int i = 0; i < len; i++)
+    for (int i=0; i<len; i++)
         oFile << (unsigned char)f.get();
-}
-
-bool createDirectoryRecursive(std::string const& dirName, std::error_code& err)
-{
-    err.clear();
-    if (!fs::create_directories(dirName, err))
-    {
-        if (fs::exists(dirName))
-        {
-            // The folder already exists
-            err.clear();
-            return false;
-        }
-        return true;
-    }
-    return false;
 }
 
 
@@ -84,12 +56,12 @@ void writeMidiFile(ifstream& f, size_t offset)
         string test = readString<4>(f);
         if (test != MAGIC_TRACK)
             break;
-
+        
         // Get chunk size
         auto preRead = f.tellg();
         uint32_t chunkSize = readBytes<uint32_t>(f);
         f.seekg(preRead);
-
+        
         // Write magic header
         oFile << MAGIC_TRACK;
 
@@ -97,7 +69,7 @@ void writeMidiFile(ifstream& f, size_t offset)
         readBytesToFile(f, oFile, 4);
 
         // Convert to little endian
-        chunkSize = _byteswap_ulong(chunkSize);
+        chunkSize = __builtin_bswap32(chunkSize);
 
         // Read track chunk
         readBytesToFile(f, oFile, chunkSize);
@@ -105,10 +77,10 @@ void writeMidiFile(ifstream& f, size_t offset)
 
     oFile.close();
 
-    cout << "Wrote to midi file: '" << oFileName << "'" << endl;
+    cout << "Wrote to midi file: '" << oFileName << "'" << endl << endl;
 }
 
-void readMidiFiles(ifstream& f)
+void readMidiFiles(ifstream &f)
 {
     while (!f.eof())
     {
@@ -117,7 +89,7 @@ void readMidiFiles(ifstream& f)
 
         if (c != 'M')
             continue;
-
+        
         // Read rest of magic
         if (c + readString<3>(f) == MAGIC_HEADER)
         {
@@ -130,7 +102,6 @@ void readMidiFiles(ifstream& f)
 
 int main(int argc, char** argv)
 {
-    // Print usage
     if (argc <= 1)
     {
         cout << "Usage: [filepath]" << endl;
@@ -149,15 +120,6 @@ int main(int argc, char** argv)
 
     if (f.is_open())
     {
-        // Create output directory
-        error_code err;
-        if (createDirectoryRecursive("output", err))
-        {
-            cout << "Could not create output directory" << endl;
-            f.close();
-            return 0;
-        }
-
         // Try to read midi data from file
         readMidiFiles(f);
         // Close file
@@ -171,9 +133,8 @@ int main(int argc, char** argv)
     // Get time elapsed
     auto tEnd = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(tEnd - tStart);
-    cout << endl << "Time taken: " << duration.count() << "ms" << endl;
+    cout << "Time taken: " << duration.count() << "ms" << endl;
 
-    cout << "Press ENTER to close" << endl;
-    cin.get();
+    cout << "end of program" << endl;
     return 0;
 }
