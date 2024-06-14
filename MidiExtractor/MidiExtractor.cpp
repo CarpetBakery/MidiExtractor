@@ -22,6 +22,7 @@ namespace fs = std::filesystem;
 // For convenience :(
 using namespace std;
 
+
 // File reading helpers
 template<unsigned len> string readString(istream& stream)
 {
@@ -66,11 +67,10 @@ bool createDirectoryRecursive(std::string const& dirName, std::error_code& err)
 
 void writeMidiFile(ifstream& f, size_t offset)
 {
-    // Output file stream
+    // NOTE: If we somehow find a midi header at the very end of a file it would probably not be good
+    // Output file
     ofstream oFile;
-
-    // Output file name
-    string oFileName = "output/Midi" + to_string((int)offset - 4) + ".mid";
+    string oFileName = "output/Midi - " + to_string((int)offset - 4) + ".mid";
 
     // Open output file
     oFile.open(oFileName, ios::binary);
@@ -112,29 +112,43 @@ void writeMidiFile(ifstream& f, size_t offset)
     cout << "Wrote to midi file: '" << oFileName << "'" << endl;
 }
 
-void readMidiFiles(ifstream& f)
+void readMidiFiles(ifstream& f, int& fileFoundCount)
 {
+    // Step through file one byte at a time to find a midi file header
     while (!f.eof())
     {
         // Char at current offset
         char c = f.get();
-
+        streampos pBeforeReadString;
+        
         if (c != 'M')
             continue;
+        
+        // We read 3 bytes with "readString" below.
+        // If it ends up not being a midi header, step back 3 bytes so we don't accidentally skip over anything
+        pBeforeReadString = f.tellg();
 
         // Read rest of magic
         if (c + readString<3>(f) == MAGIC_HEADER)
         {
+            // We found a midi file
+            fileFoundCount++;
+
             streampos offset = f.tellg();
             // cout << "FOUND MIDI FILE AT OFFSET: " << to_string((int)offset - 4) << endl;
             writeMidiFile(f, static_cast<int>(offset));
+        }
+        else
+        {
+            // Jump back 3 bytes
+            f.seekg(pBeforeReadString);
         }
     }
 }
 
 int main(int argc, char** argv)
 {
-    // Print usage
+    // If no cmdline args
     if (argc <= 1)
     {
         cout << "Usage: [filepath]" << endl;
@@ -143,9 +157,13 @@ int main(int argc, char** argv)
 
     // For execution time
     auto tStart = chrono::high_resolution_clock::now();
-
-    // Asset file to search for midis
+    // Number of midi files found
+    int fileFoundCount = 0;
+    // Asset filepath to search for midis
     string fileName = argv[1];
+
+
+    // -- Extract midis --
 
     // Open assets file
     ifstream f;
@@ -163,7 +181,8 @@ int main(int argc, char** argv)
         }
 
         // Try to read midi data from file
-        readMidiFiles(f);
+        readMidiFiles(f, fileFoundCount);
+
         // Close file
         f.close();
     }
@@ -172,12 +191,17 @@ int main(int argc, char** argv)
         cout << fileName << " does not exist" << endl;
     }
 
+
+    // -- Print end message --
+    
     // Get time elapsed
     auto tEnd = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(tEnd - tStart);
     cout << endl << "Time taken: " << duration.count() << "ms" << endl;
 
-    cout << "Press ENTER to close" << endl;
+    cout << "Number of midi files found: " << fileFoundCount << endl;
+
+    cout << endl << "-- Press ENTER to close --" << endl;
     cin.get();
     return 0;
 }
