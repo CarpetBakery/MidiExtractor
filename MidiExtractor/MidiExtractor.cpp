@@ -23,12 +23,20 @@ namespace fs = std::filesystem;
 using namespace std;
 
 
-// File reading helpers
+// -- File reading helpers --
 template<unsigned len> string readString(istream& stream)
 {
     char buff[len + 1] = { 0 };
     stream.read(buff, len);
-    return std::string(buff);
+    return string(buff);
+}
+
+string readStringNullTerminated(ifstream& f)
+{
+    // Read null terminated string
+    string s;
+    getline(f, s, '\0');
+    return s;
 }
 
 template <typename T, unsigned length = sizeof(T)> T readBytes(std::ifstream& f)
@@ -65,12 +73,12 @@ bool createDirectoryRecursive(std::string const& dirName, std::error_code& err)
 }
 
 
-void writeMidiFile(ifstream& f, size_t offset)
+void writeMidiFile(ifstream& f, size_t offset, string& outputDir)
 {
     // NOTE: If we somehow find a midi header at the very end of a file it would probably not be good
     // Output file
     ofstream oFile;
-    string oFileName = "output/Midi - " + to_string((int)offset - 4) + ".mid";
+    string oFileName = outputDir + "/Midi - " + to_string((int)offset - 4) + ".mid";
 
     // Open output file
     oFile.open(oFileName, ios::binary);
@@ -106,13 +114,29 @@ void writeMidiFile(ifstream& f, size_t offset)
         // Read track chunk
         readBytesToFile(f, oFile, chunkSize);
     }
-
     oFile.close();
+
+    // The Big Catch tends to have the name of the file right after, so read that and rename the file
+    string oFileNameNew = readStringNullTerminated(f);
+    if (!oFileNameNew.empty())
+    {
+        // Make sure we prefix the name with our output directory
+        oFileNameNew = outputDir + "/" + oFileNameNew;
+
+        if (rename(oFileName.c_str(), oFileNameNew.c_str()))
+        {
+            cout << "Failed to rename " << oFileName << " to " << oFileNameNew;
+        }
+        else
+        {
+            oFileName = oFileNameNew;
+        }
+    }
 
     cout << "Wrote to midi file: '" << oFileName << "'" << endl;
 }
 
-void readMidiFiles(ifstream& f, int& fileFoundCount)
+void readMidiFiles(ifstream& f, int& fileFoundCount, string& outputDir)
 {
     // Step through file one byte at a time to find a midi file header
     while (!f.eof())
@@ -136,7 +160,7 @@ void readMidiFiles(ifstream& f, int& fileFoundCount)
 
             streampos offset = f.tellg();
             // cout << "FOUND MIDI FILE AT OFFSET: " << to_string((int)offset - 4) << endl;
-            writeMidiFile(f, static_cast<int>(offset));
+            writeMidiFile(f, static_cast<int>(offset), outputDir);
         }
         else
         {
@@ -162,6 +186,17 @@ int main(int argc, char** argv)
     // Asset filepath to search for midis
     string fileName = argv[1];
 
+    // Get output directory based on file name
+    string outputDir = fileName.substr(fileName.find_last_of("/\\") + 1);
+    {
+        // Remove file extension
+        size_t found = outputDir.find_last_of('.');
+        if (found)
+        {
+            outputDir = outputDir.substr(0, found);
+        }
+    }
+
 
     // -- Extract midis --
 
@@ -173,7 +208,7 @@ int main(int argc, char** argv)
     {
         // Create output directory
         error_code err;
-        if (createDirectoryRecursive("output", err))
+        if (createDirectoryRecursive(outputDir, err))
         {
             cout << "Could not create output directory" << endl;
             f.close();
@@ -181,7 +216,7 @@ int main(int argc, char** argv)
         }
 
         // Try to read midi data from file
-        readMidiFiles(f, fileFoundCount);
+        readMidiFiles(f, fileFoundCount, outputDir);
 
         // Close file
         f.close();
