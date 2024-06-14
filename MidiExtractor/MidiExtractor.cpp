@@ -39,8 +39,12 @@ template <typename T, unsigned length = sizeof(T)> T readBytes(std::ifstream& f)
 
 void readBytesToFile(ifstream& f, ofstream& oFile, size_t len)
 {
-    for (int i = 0; i < len; i++)
-        oFile << (unsigned char)f.get();
+    unsigned char* buff = new unsigned char[len];
+
+    f.read((char*)buff, len);
+    oFile.write((char*)buff, len);
+
+    delete[] buff;
 }
 
 bool createDirectoryRecursive(std::string const& dirName, std::error_code& err)
